@@ -11,10 +11,11 @@ MFRC522 reader(SS_PIN, RST_PIN); // Instancia del lector RFID
 // Configuración WiFi
 const char *ssid = "whoami";         
 const char *password = "whoami12";          
-const char* nombreServidor = "http://192.168.118.113/data"; 
+const char* nombreServidor = "http://192.168.153.113/data"; 
 
 // Objeto para cliente WiFi
 WiFiClient cliente;
+
 
 void setup() {
   Serial.begin(115200);
@@ -79,5 +80,3 @@ void loop() {
   http.end();
   delay(2000);
 }
-
- 
