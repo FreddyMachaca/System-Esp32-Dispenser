@@ -1,75 +1,152 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <Wire.h>
-#include <LiquidCrystal_I2C.h>
+// #include <LiquidCrystal_I2C.h>
 #include <HTTPClient.h>
 #include <Keypad.h>
 
 // Configuración WiFi
-
 const char *ssid = "whoami";
 const char *password = "whoami12";
 
 // Inicializar servidor en el puerto 80
 WebServer server(80);
 
-// Configuración del LCD
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+// Configuración del LCD (desactivado)
+// LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 // Dirección del servidor remoto
-const String SERVER_ADDRESS = "http://192.168.118.89/Proyecto_SCO";
+const String SERVER_ADDRESS = "http://192.168.153.89/Proyecto_SCO";
 
 // Configuración del teclado matricial
-const byte FILAS = 4; // Número de filas
-const byte COLUMNAS = 3; // Número de columnas
-
-// Definición de las teclas del teclado
+const byte FILAS = 4;
+const byte COLUMNAS = 3;
 char teclas[FILAS][COLUMNAS] = {
     {'1', '2', '3'},
     {'4', '5', '6'},
     {'7', '8', '9'},
     {'*', '0', '#'}
 };
-
-// Definición de los pines de filas y columnas
-byte pinesFilas[FILAS] = {32, 33, 25, 26};
-byte pinesColumnas[COLUMNAS] = {27, 14, 12};
-
+// Pines de conexión del teclado matricial
+byte pinesFilas[FILAS] = {15, 2, 0, 4};
+byte pinesColumnas[COLUMNAS] = {16, 17, 5};
 Keypad teclado = Keypad(makeKeymap(teclas), pinesFilas, pinesColumnas, FILAS, COLUMNAS);
 
 // Variables globales
-String serialRecibido = "";  // Almacena el serial recibido
-String codigoProducto = ""; // Código ingresado por el teclado
+String serialRecibido = "";
+String codigoProducto = "";
+int ultimoNumeroActivado = 0; 
+bool salidasActivas = false;
 
-// Pines para los motores
-const int MOTOR1_PIN1 = 13, MOTOR1_PIN2 = 15;
-const int MOTOR2_PIN1 = 2, MOTOR2_PIN2 = 4;
+// Pines de salida
+const int OUTPUT_AE = 18; 
+const int OUTPUT_BE = 19; 
+const int OUTPUT_CC = 21; 
+const int OUTPUT_BB = 22; 
+const int OUTPUT_AA = 23; 
 
-// Pines para sensores infrarrojos
-const int SENSOR1_PIN = 18, SENSOR2_PIN = 19;
+// Pin de entrada para detener las salidas
+const int PIN_STOP = 13;
 
-// Función para manejar solicitudes POST del ESP8266
+// Función para establecer las salidas según el número presionado (1-20)
+void establecerSalidas(int numero) {
+    // Valores por defecto (todo apagado)
+    int ae = 0, be = 0, cc = 0, bb = 0, aa = 0;
+    
+    if (numero >= 1 && numero <= 20) {
+        switch(numero) {
+            case 1:  // 01000 - M0
+                be = 1; cc = 0; bb = 0; aa = 0;
+                break;
+            case 2:  // 01001 - M1
+                be = 1; cc = 0; bb = 0; aa = 1;
+                break;
+            case 3:  // 01010 - M2
+                be = 1; cc = 0; bb = 1; aa = 0;
+                break;
+            case 4:  // 01011 - M3
+                be = 1; cc = 0; bb = 1; aa = 1;
+                break;
+            case 5:  // 01100 - M4
+                be = 1; cc = 1; bb = 0; aa = 0;
+                break;
+            case 6:  // 01101 - M5
+                be = 1; cc = 1; bb = 0; aa = 1;
+                break;
+            case 7:  // 01110 - M6
+                be = 1; cc = 1; bb = 1; aa = 0;
+                break;
+            case 8:  // 01111 - M7
+                be = 1; cc = 1; bb = 1; aa = 1;
+                break;
+            case 9:  // 10000 - M8
+                ae = 1; be = 0; cc = 0; bb = 0; aa = 0;
+                break;
+            case 10:  // 10001 - M9
+                ae = 1; be = 0; cc = 0; bb = 0; aa = 1;
+                break;
+            case 11:  // 10010 - M10
+                ae = 1; be = 0; cc = 0; bb = 1; aa = 0;
+                break;
+            case 12:  // 10011 - M11
+                ae = 1; be = 0; cc = 0; bb = 1; aa = 1;
+                break;
+            case 13:  // 10100 - M12
+                ae = 1; be = 0; cc = 1; bb = 0; aa = 0;
+                break;
+            case 14:  // 10101 - M13
+                ae = 1; be = 0; cc = 1; bb = 0; aa = 1;
+                break;
+            case 15:  // 10110 - M14
+                ae = 1; be = 0; cc = 1; bb = 1; aa = 0;
+                break;
+            case 16:  // 10111 - M15
+                ae = 1; be = 0; cc = 1; bb = 1; aa = 1;
+                break;
+            case 17:  // 11000 - M16
+                ae = 1; be = 1; cc = 0; bb = 0; aa = 0;
+                break;
+            case 18:  // 11001 - M17
+                ae = 1; be = 1; cc = 0; bb = 0; aa = 1;
+                break;
+            case 19:  // 11010 - M18
+                ae = 1; be = 1; cc = 0; bb = 1; aa = 0;
+                break;
+            case 20:  // 11011 - M19
+                ae = 1; be = 1; cc = 0; bb = 1; aa = 1;
+                break;
+        }
+    }
+    
+    // Establecer las salidas según los valores calculados
+    digitalWrite(OUTPUT_AE, ae);
+    digitalWrite(OUTPUT_BE, be);
+    digitalWrite(OUTPUT_CC, cc);
+    digitalWrite(OUTPUT_BB, bb);
+    digitalWrite(OUTPUT_AA, aa);
+    
+    if (numero > 0) {
+        Serial.println("Número: " + String(numero));
+    }
+}
+
 void handleData() {
     if (server.hasArg("plain")) {
         serialRecibido = server.arg("plain");
         Serial.println("Serial recibido del ESP8266: " + serialRecibido);
 
-        // Mostrar en el LCD
-        lcd.clear();
-        lcd.print("Serial recibido:");
-        lcd.setCursor(0, 1);
-        lcd.print(serialRecibido);
+        // lcd.clear();
+        // lcd.print("Serial recibido:");
+        // lcd.setCursor(0, 1);
+        // lcd.print(serialRecibido);
 
-        // Enviar el serial al servidor
         enviarAlServidor(serialRecibido, 0, "");
-
         server.send(200, "text/plain", "Serial recibido y enviado");
     } else {
         server.send(400, "text/plain", "No se recibieron datos");
     }
 }
 
-// Función para enviar datos al servidor remoto
 void enviarAlServidor(String dato, int tipo, String tecla) {
     HTTPClient http;
     WiFiClient client;
@@ -79,111 +156,53 @@ void enviarAlServidor(String dato, int tipo, String tecla) {
         full_url = SERVER_ADDRESS + "/ESP32/recibirSerial.php";
         payload = "serial=" + dato;
     } else if (tipo == 1) {
-      boolean estado_p;
-
-      if (tecla == "10") { 
-          estado_p = controlarMotor(MOTOR1_PIN1, MOTOR1_PIN2, SENSOR2_PIN); 
-          if (estado_p) {
-              // Operación exitosa
-              full_url = SERVER_ADDRESS + "/ESP32/registroTransaccion.php";
-              payload = "serial=" + dato + "&num=" + tecla; 
-          } else {
-              // Error: No se detectó el objeto
-              mostrarRespuestaEnLCD("Sin deteccion");
-              delay(3000); // Mostrar mensaje por 3 segundos
-          }
-      } else if (tecla == "8") {  
-          estado_p = controlarMotor(MOTOR2_PIN1, MOTOR2_PIN2, SENSOR1_PIN);  
-
-          if (estado_p) {
-              // Operación exitosa
-              full_url = SERVER_ADDRESS + "/ESP32/registroTransaccion.php";
-              payload = "serial=" + dato + "&num=" + tecla; 
-          } else {
-              // Error: No se detectó el objeto 
-              mostrarRespuestaEnLCD("Sin deteccion");
-              delay(3000); // Mostrar mensaje por 3 segundos
-          }
-      } else { 
-        // Operaciones para teclas distintas de "10" y "8"
         full_url = SERVER_ADDRESS + "/ESP32/registroTransaccion.php";
         payload = "serial=" + dato + "&num=" + tecla;
-      }
     }
 
-    http.begin(client, full_url);
-    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+    if (full_url.length() > 0) {
+        http.begin(client, full_url);
+        http.addHeader("Content-Type", "application/x-www-form-urlencoded");
 
-    int codigo_respuesta = http.POST(payload);
-    if (codigo_respuesta > 0) {
-        Serial.println("Código HTTP: " + String(codigo_respuesta));
-        if (codigo_respuesta == 200) {
-            String respuesta = http.getString();
-            Serial.println("Respuesta del servidor: " + respuesta);
-            if (tipo == 0) {
-              mostrarRespuestaEnLCD(respuesta);
-            }else if(tipo == 1){
-              mostrarRespuestaEnLCD(respuesta);
-              delay(3000);
-            } 
+        int codigo_respuesta = http.POST(payload);
+        if (codigo_respuesta > 0) {
+            Serial.println("Código HTTP: " + String(codigo_respuesta));
+            if (codigo_respuesta == 200) {
+                String respuesta = http.getString();
+                Serial.println("Respuesta del servidor: " + respuesta);
+                // mostrarRespuestaEnLCD(respuesta);
+                delay(3000);
+            }
+        } else {
+            Serial.println("Error enviando datos al servidor.");
         }
+        http.end();
     } else {
-        Serial.println("Error enviando datos al servidor.");
+        Serial.println("No se preparó URL para enviar al servidor.");
     }
-    http.end();
 }
 
-// Mostrar respuesta en el LCD (con manejo de líneas)
 void mostrarRespuestaEnLCD(String respuesta) {
-    lcd.clear();
-    int separador = respuesta.indexOf('\n');
-    if (separador != -1) {
-        lcd.setCursor(0, 0);
-        lcd.print(respuesta.substring(0, separador));
-        lcd.setCursor(0, 1);
-        lcd.print(respuesta.substring(separador + 1)); 
-    } else {
-        lcd.print(respuesta); 
-    }
-}
- 
-bool controlarMotor(int motorPin1, int motorPin2, int sensorPin) {
-    // Encender el motor
-    digitalWrite(motorPin1, LOW);
-    digitalWrite(motorPin2, HIGH);
-
-    bool estado = true; // Indica si el sensor detectó un objeto
-    unsigned long tiempoInicio = millis();
-    unsigned long tiempoMaximo = 5000; // Tiempo máximo para esperar (5 segundos)
-
-    // Esperar hasta que el sensor detecte un objeto o se agote el tiempo
-    while (digitalRead(sensorPin) == HIGH) {
-        if (millis() - tiempoInicio > tiempoMaximo) {
-            Serial.println("Timeout: Objeto no detectado.");
-            estado = false; // Cambiar estado a false si no se detectó objeto
-            break;          // Salir del bucle
-        }
-        delay(20); // Pequeño retraso para evitar bucles rápidos
-    }
-
-    // Apagar el motor después de salir del bucle
-    digitalWrite(motorPin1, LOW);
-    digitalWrite(motorPin2, LOW);
-
-    return estado; // Devolver el estado de detección del sensor
+    // lcd.clear();
+    // int separador = respuesta.indexOf('\n');
+    // if (separador != -1) {
+    //     lcd.setCursor(0, 0);
+    //     lcd.print(respuesta.substring(0, separador));
+    //     lcd.setCursor(0, 1);
+    //     lcd.print(respuesta.substring(separador + 1)); 
+    // } else {
+    //     lcd.print(respuesta); 
+    // }
 }
 
-
-// Configuración inicial
 void setup() {
     Serial.begin(115200);
     WiFi.begin(ssid, password);
 
-    lcd.init();
-    lcd.backlight();
-    lcd.print("Conectando...");
+    // lcd.init();
+    // lcd.backlight();
+    // lcd.print("Conectando...");
 
-    // Conexión WiFi con tiempo máximo de espera
     int intentos = 30;
     while (WiFi.status() != WL_CONNECTED && intentos > 0) {
         delay(1000);
@@ -193,57 +212,108 @@ void setup() {
     if (WiFi.status() == WL_CONNECTED) {
         Serial.println("Conectado a WiFi");
         Serial.println("IP: " + WiFi.localIP().toString());
-        lcd.clear();
-        lcd.print("WiFi Conectado");
+        // lcd.clear();
+        // lcd.print("WiFi Conectado");
     } else {
         Serial.println("Error: No se pudo conectar.");
         ESP.restart();
     }
+    
+    // Configurar pines de salida
+    pinMode(OUTPUT_AE, OUTPUT);
+    pinMode(OUTPUT_BE, OUTPUT);
+    pinMode(OUTPUT_CC, OUTPUT);
+    pinMode(OUTPUT_BB, OUTPUT);
+    pinMode(OUTPUT_AA, OUTPUT);
+    
+    // Configurar pin de parada como entrada
+    pinMode(PIN_STOP, INPUT);
+    
+    // Inicializar todos los pines de salida en 0
+    digitalWrite(OUTPUT_AE, LOW);
+    digitalWrite(OUTPUT_BE, LOW);
+    digitalWrite(OUTPUT_CC, LOW);
+    digitalWrite(OUTPUT_BB, LOW);
+    digitalWrite(OUTPUT_AA, LOW);
 
-    // Configurar pines de motores y sensores
-    pinMode(MOTOR1_PIN1, OUTPUT);
-    pinMode(MOTOR1_PIN2, OUTPUT);
-    pinMode(MOTOR2_PIN1, OUTPUT);
-    pinMode(MOTOR2_PIN2, OUTPUT);
-    pinMode(SENSOR1_PIN, INPUT);
-    pinMode(SENSOR2_PIN, INPUT);
-
-    // Iniciar servidor web
     server.on("/data", HTTP_POST, handleData);
     server.begin();
     Serial.println("Servidor iniciado");
 }
 
-// Bucle principal
 void loop() {
     server.handleClient();
 
+    // Verificar si hay que desactivar las salidas por pin 13 en HIGH
+    if (salidasActivas) {
+        int estado = digitalRead(PIN_STOP);
+        if (estado == HIGH) {
+            establecerSalidas(0);
+            salidasActivas = false;
+            ultimoNumeroActivado = 0;
+            Serial.println("Pin 13 HIGH: salidas desactivadas");
+        }
+    }
+
     char tecla = teclado.getKey();
-  if (tecla) {
-        if (tecla == '*') {
-            // Borrar el último dígito
+    if (tecla) {
+        // Si la tecla es '#' se borra el código digitado
+        if (tecla == '#') {
             if (codigoProducto.length() > 0) {
                 codigoProducto = codigoProducto.substring(0, codigoProducto.length() - 1);
             }
-        } else if (tecla == '#') {
-            if (serialRecibido != "") {
-                enviarAlServidor(serialRecibido, 1, codigoProducto);
-                codigoProducto = ""; // Reiniciar código
-                serialRecibido = ""; // Limpiar serial recibido
-            }else{
-              lcd.clear();
-              lcd.print("Esperando");
-              lcd.setCursor(0, 1);
-              lcd.print("Tarjeta");
-              delay(2000);
-            }
-        } else if (codigoProducto.length() < 6) { // Limitar a 6 caracteres
-            codigoProducto += tecla;
         }
-
-        lcd.clear();
-        lcd.print("Codigo: ");
-        lcd.setCursor(0, 1);
-        lcd.print(codigoProducto);
-  }
+        // Si la tecla es '*' se actúa como ENTER: activar las salidas  
+        else if (tecla == '*') {
+            Serial.println("ENTER presionado (tecla '*'), codigoProducto: " + codigoProducto);
+            if (codigoProducto.length() > 0) {
+                int numProd = codigoProducto.toInt();
+                if (numProd >= 1 && numProd <= 20) {
+                    establecerSalidas(numProd);
+                    salidasActivas = true;
+                    ultimoNumeroActivado = numProd;
+                    Serial.println("Salidas ACTIVADAS para producto: " + String(numProd));
+                    if (serialRecibido != "") {
+                        enviarAlServidor(serialRecibido, 1, codigoProducto);
+                    }
+                } else {
+                    Serial.println("Código de producto inválido para activar salidas: " + codigoProducto);
+                }
+            } else {
+                Serial.println("ENTER presionado pero código no establecido");
+            }
+            codigoProducto = ""; 
+            delay(200);
+        }
+        else {
+            String nuevoCodigoProducto = "";
+            String intento = codigoProducto + tecla;
+            int numIntento = 0;
+            if (intento.length() > 0) numIntento = intento.toInt();
+    
+            if (tecla == '0' && codigoProducto == "") {
+                nuevoCodigoProducto = "";
+            }
+            else if (numIntento >= 1 && numIntento <= 20 && intento.length() <= 2) {
+                if (intento.length() == 2 && intento[0] == '0') {
+                    nuevoCodigoProducto = intento.substring(1);
+                } else {
+                    nuevoCodigoProducto = intento;
+                }
+            } else {
+                if (tecla >= '1' && tecla <= '9') {
+                    nuevoCodigoProducto = String(tecla);
+                } else {
+                    nuevoCodigoProducto = "";
+                }
+            }
+            codigoProducto = nuevoCodigoProducto;
+        }
+    
+        if (codigoProducto.length() > 0) {
+            Serial.println("Codigo: " + codigoProducto);
+        } else {
+            Serial.println("Codigo: --");
+        }
+    }
 }
