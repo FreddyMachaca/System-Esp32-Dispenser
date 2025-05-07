@@ -4,6 +4,7 @@
 // #include <LiquidCrystal_I2C.h>
 #include <HTTPClient.h>
 #include <Keypad.h>
+#include <ArduinoJson.h>
 
 // Configuración WiFi
 const char *ssid = "whoami";
@@ -37,6 +38,14 @@ String serialRecibido = "";
 String codigoProducto = "";
 int ultimoNumeroActivado = 0; 
 bool salidasActivas = false;
+unsigned long tiempoActivacion = 0;
+bool esperandoCaida = false;
+bool productoVerificado = false;
+String infoProducto = "";
+String infoEstudiante = "";
+String infoPrecio = "";
+String infoSaldoActual = "";
+String infoSaldoRestante = "";
 
 // Pines de salida
 const int OUTPUT_AE = 18; 
@@ -47,6 +56,15 @@ const int OUTPUT_AA = 23;
 
 // Pin de entrada para detener las salidas
 const int PIN_STOP = 13;
+
+// Tiempo de espera máximo para detección de caída (5 segundos)
+const unsigned long TIEMPO_ESPERA_CAIDA = 5000;
+
+// Prototipos de funciones
+void establecerSalidas(int numero);
+void enviarAlServidor(String dato, int tipo, String tecla, String accion = "verificar");
+void procesarRespuestaTransaccion(String respuesta, String accion);
+void mostrarRespuestaEnLCD(String respuesta);
 
 // Función para establecer las salidas según el número presionado (1-20)
 void establecerSalidas(int numero) {
@@ -134,6 +152,10 @@ void handleData() {
     if (server.hasArg("plain")) {
         serialRecibido = server.arg("plain");
         Serial.println("Serial recibido del ESP8266: " + serialRecibido);
+        Serial.println("\n----- TARJETA DETECTADA -----");
+        Serial.println("¡Bienvenido! Por favor ingrese el número del producto (1-20)");
+        Serial.println("y presione * para confirmar");
+        Serial.println("-----------------------------\n");
 
         // lcd.clear();
         // lcd.print("Serial recibido:");
@@ -147,17 +169,17 @@ void handleData() {
     }
 }
 
-void enviarAlServidor(String dato, int tipo, String tecla) {
+void enviarAlServidor(String dato, int tipo, String tecla, String accion) {
     HTTPClient http;
     WiFiClient client;
     String full_url, payload;
 
     if (tipo == 0) {
-        full_url = SERVER_ADDRESS + "/ESP32/recibirSerial.php";
+        full_url = SERVER_ADDRESS + "/Esp32/recibirSerial.php";
         payload = "serial=" + dato;
     } else if (tipo == 1) {
-        full_url = SERVER_ADDRESS + "/ESP32/registroTransaccion.php";
-        payload = "serial=" + dato + "&num=" + tecla;
+        full_url = SERVER_ADDRESS + "/Esp32/registroTransaccion.php";
+        payload = "serial=" + dato + "&num=" + tecla + "&accion=" + accion;
     }
 
     if (full_url.length() > 0) {
@@ -170,8 +192,14 @@ void enviarAlServidor(String dato, int tipo, String tecla) {
             if (codigo_respuesta == 200) {
                 String respuesta = http.getString();
                 Serial.println("Respuesta del servidor: " + respuesta);
+                
+                // Procesar la respuesta JSON
+                if (tipo == 1) { // Si es una transacción
+                    procesarRespuestaTransaccion(respuesta, accion);
+                }
+                
                 // mostrarRespuestaEnLCD(respuesta);
-                delay(3000);
+                delay(500);
             }
         } else {
             Serial.println("Error enviando datos al servidor.");
@@ -179,6 +207,67 @@ void enviarAlServidor(String dato, int tipo, String tecla) {
         http.end();
     } else {
         Serial.println("No se preparó URL para enviar al servidor.");
+    }
+}
+
+// Procesar la respuesta JSON de la transacción
+void procesarRespuestaTransaccion(String respuesta, String accion) {
+    DynamicJsonDocument doc(1024);
+    DeserializationError error = deserializeJson(doc, respuesta);
+    
+    if (error) {
+        Serial.println("Error al analizar el JSON");
+        return;
+    }
+    
+    bool status = doc["status"];
+    String mensaje = doc["message"];
+    
+    Serial.println("Status: " + String(status ? "true" : "false"));
+    Serial.println("Mensaje: " + mensaje);
+    
+    if (status && doc.containsKey("data")) {
+        JsonObject data = doc["data"];
+        
+        if (accion == "verificar") {
+            // Guardar información para mostrar cuando se complete la transacción
+            infoEstudiante = data["estudiante"].as<String>();
+            infoProducto = data["producto"].as<String>();
+            infoPrecio = data["precio"].as<String>();
+            infoSaldoActual = data["saldo_actual"].as<String>();
+            infoSaldoRestante = data["saldo_restante"].as<String>();
+            
+            // Mostrar información en el serial
+            Serial.println("\n----- DETALLE DE PRODUCTO -----");
+            Serial.println("Estudiante: " + infoEstudiante);
+            Serial.println("Producto: " + infoProducto);
+            Serial.println("Precio: " + infoPrecio);
+            Serial.println("Saldo actual: " + infoSaldoActual);
+            Serial.println("Saldo después de compra: " + infoSaldoRestante);
+            Serial.println("-------------------------------\n");
+            
+            productoVerificado = true;
+        } 
+        else if (accion == "comprar") {
+            String saldoNuevo = data["saldo_actual"].as<String>();
+            
+            Serial.println("\n------ COMPRA REALIZADA ------");
+            Serial.println("Estudiante: " + infoEstudiante);
+            Serial.println("Producto: " + infoProducto);
+            Serial.println("Precio: " + infoPrecio);
+            Serial.println("Saldo anterior: " + infoSaldoActual);
+            Serial.println("Saldo actual: " + saldoNuevo);
+            Serial.println("-------------------------------\n");
+        }
+    } else {
+        Serial.println("\n------ ERROR EN TRANSACCIÓN ------");
+        Serial.println(mensaje);
+        Serial.println("---------------------------------\n");
+        
+        // Si la verificación falla, asegurarse de marcar como no verificado
+        if (accion == "verificar") {
+            productoVerificado = false;
+        }
     }
 }
 
@@ -244,14 +333,34 @@ void setup() {
 void loop() {
     server.handleClient();
 
-    // Verificar si hay que desactivar las salidas por pin 13 en HIGH
+    // Verificar si hay que desactivar las salidas por pin 13 en HIGH (caída del producto)
     if (salidasActivas) {
         int estado = digitalRead(PIN_STOP);
         if (estado == HIGH) {
+            // Guardar el número de slot antes de apagar las salidas
+            int slotNumero = ultimoNumeroActivado;
             establecerSalidas(0);
             salidasActivas = false;
+            esperandoCaida = false;
+            
+            // Producto detectado, procesar la compra
+            if (productoVerificado && serialRecibido != "") {
+                Serial.println("Producto caído detectado - Procesando compra...");
+                // Usar el slotNumero guardado, no codigoProducto que podría estar vacío
+                enviarAlServidor(serialRecibido, 1, String(slotNumero), "comprar");
+            }
+            
             ultimoNumeroActivado = 0;
-            Serial.println("Pin 13 HIGH: salidas desactivadas");
+            Serial.println("Pin 13 HIGH: Producto entregado, salidas desactivadas");
+        }
+        
+        // Si está esperando la caída del producto y ha pasado el tiempo máximo, apagar las salidas
+        if (esperandoCaida && (millis() - tiempoActivacion > TIEMPO_ESPERA_CAIDA)) {
+            establecerSalidas(0);
+            salidasActivas = false;
+            esperandoCaida = false;
+            ultimoNumeroActivado = 0;
+            Serial.println("Tiempo de espera excedido: No se detectó caída del producto");
         }
     }
 
@@ -269,12 +378,25 @@ void loop() {
             if (codigoProducto.length() > 0) {
                 int numProd = codigoProducto.toInt();
                 if (numProd >= 1 && numProd <= 20) {
-                    establecerSalidas(numProd);
-                    salidasActivas = true;
-                    ultimoNumeroActivado = numProd;
-                    Serial.println("Salidas ACTIVADAS para producto: " + String(numProd));
+                    // Verificar si el serialRecibido existe y si hay producto en el slot
                     if (serialRecibido != "") {
-                        enviarAlServidor(serialRecibido, 1, codigoProducto);
+                        // Primero verificar si hay producto y el estudiante puede comprarlo
+                        enviarAlServidor(serialRecibido, 1, codigoProducto, "verificar");
+                        
+                        // Si el producto está verificado, activar las salidas
+                        if (productoVerificado) {
+                            establecerSalidas(numProd);
+                            salidasActivas = true;
+                            esperandoCaida = true;
+                            tiempoActivacion = millis();
+                            ultimoNumeroActivado = numProd;
+                            Serial.println("Salidas ACTIVADAS para producto: " + String(numProd));
+                            Serial.println("Esperando caída del producto (máximo 5 segundos)...");
+                        } else {
+                            Serial.println("No se pudo activar las salidas: Producto no verificado");
+                        }
+                    } else {
+                        Serial.println("No hay tarjeta RFID registrada. Acerque una tarjeta primero.");
                     }
                 } else {
                     Serial.println("Código de producto inválido para activar salidas: " + codigoProducto);
