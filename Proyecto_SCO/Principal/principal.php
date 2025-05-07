@@ -140,9 +140,9 @@
                     </li>
                     <!-- Productos -->
                     <li class="menu-item">
-                        <a href="../Estudiante/lista.php" class="menu-link" target="contenedorPrincipal">
+                        <a href="../Productos/lista.php" class="menu-link" target="contenedorPrincipal">
                             <i class="menu-icon tf-icons ti ti-shopping-cart"></i>
-                            <div data-i18n="estudiante">Productos</div>
+                            <div data-i18n="productos">Productos</div>
                         </a> 
                     </li> 
                      
