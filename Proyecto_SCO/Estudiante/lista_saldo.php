@@ -131,19 +131,128 @@ $(document).ready(function() {
         let tiempoEspera = 30000; // 30 segundos
         let tiempoInicio = Date.now();
         let intervalo, timeout;
-        let cancelado = false;
-
-        Swal.fire({
-            title: 'Esperando código RFID...',
-            html: 'Se cerrará en <b>30</b> segundos.',
+        let cancelado = false;        Swal.fire({
+            title: '<span class="text-primary"><i class="feather ti ti-device-watch"></i> Escaneando RFID</span>',
+            html: `
+                <div class="card-scan-rfid">
+                    <div class="rfid-animation">
+                        <div class="waves"></div>
+                        <div class="waves"></div>
+                        <div class="waves"></div>
+                        <div class="card-icon">
+                            <i class="fas fa-id-card fa-2x"></i>
+                        </div>
+                    </div>
+                    <div class="scan-text">
+                        <p>Acerque la tarjeta al lector</p>
+                        <div class="countdown-bar">
+                            <div class="progress-bar"></div>
+                        </div>
+                        <span class="countdown-text">Tiempo restante: <b>30</b> segundos</span>
+                    </div>
+                </div>
+                <style>
+                    .card-scan-rfid {
+                        padding: 20px;
+                        border-radius: 10px;
+                        position: relative;
+                    }
+                    .rfid-animation {
+                        position: relative;
+                        display: flex;
+                        justify-content: center;
+                        margin-bottom: 15px;
+                        height: 150px;
+                    }
+                    .card-icon {
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        z-index: 2;
+                        background: white;
+                        border-radius: 50%;
+                        width: 60px;
+                        height: 60px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        box-shadow: 0 0 15px rgba(0,0,0,0.1);
+                        color: #5a8dee;
+                    }
+                    .waves {
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        width: 60px;
+                        height: 60px;
+                        border-radius: 50%;
+                        background-color: rgba(90, 141, 238, 0.3);
+                        animation: pulse 2s infinite;
+                        z-index: 1;
+                    }
+                    .waves:nth-child(2) {
+                        animation-delay: 0.5s;
+                    }
+                    .waves:nth-child(3) {
+                        animation-delay: 1s;
+                    }
+                    @keyframes pulse {
+                        0% {
+                            transform: translate(-50%, -50%) scale(1);
+                            opacity: 1;
+                        }
+                        100% {
+                            transform: translate(-50%, -50%) scale(3);
+                            opacity: 0;
+                        }
+                    }
+                    .scan-text {
+                        text-align: center;
+                        margin-top: 10px;
+                    }
+                    .scan-text p {
+                        font-size: 1rem;
+                        margin-bottom: 10px;
+                        color: #5a5a5a;
+                    }
+                    .countdown-bar {
+                        height: 6px;
+                        background-color: #e9ecef;
+                        border-radius: 10px;
+                        margin: 10px 0;
+                        overflow: hidden;
+                    }
+                    .progress-bar {
+                        height: 100%;
+                        background-color: #5a8dee;
+                        border-radius: 10px;
+                        width: 100%;
+                        animation: countdown 30s linear forwards;
+                    }
+                    @keyframes countdown {
+                        0% { width: 100%; }
+                        100% { width: 0%; }
+                    }
+                    .countdown-text {
+                        font-size: 0.9rem;
+                        color: #5a5a5a;
+                    }
+                </style>
+            `,
             showConfirmButton: false,
             showCancelButton: false,
             allowEscapeKey: false,
+            width: '400px',
+            padding: '20px',
+            background: '#ffffff',
+            backdrop: 'rgba(0,0,123,0.2)',
             customClass: {
-                container: 'swal2-container-zindex'
+                container: 'swal2-container-zindex',
+                popup: 'animated fadeInUp'
             },
             didOpen: () => {
-                Swal.showLoading();
                 const b = Swal.getHtmlContainer().querySelector('b');
                 let tiempoInicio = Date.now();
                 let tiempoEspera = 30000;
