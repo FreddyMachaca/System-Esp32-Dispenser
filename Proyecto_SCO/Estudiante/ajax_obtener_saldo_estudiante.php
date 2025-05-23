@@ -6,7 +6,7 @@ $response = ['status' => false];
 
 try {
     $cod_estudiante = $_POST['cod_estudiante'];
-    //! obtener saldo de estudiante
+    //obtener saldo de estudiante
     $query = "SELECT e.cod_estudiante, CONCAT(e.nombre, ' ', e.paterno, ' ', e.materno) AS nombre,
                      s.saldo_actual, s.deuda
               FROM estudiantes e

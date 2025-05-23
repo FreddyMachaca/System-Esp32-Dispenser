@@ -10,7 +10,7 @@
 
         $fecha = date('Y-m-d');
         $fecha_actualizacion = date('Y-m-d H:i:s');
-        //! Registro en la tabla estudiantes   
+        //Registro en la tabla estudiantes   
        
         $query_tarjeta = "INSERT INTO tarjetas_rfid(cod_estudiante, codigo_rfid, cod_estado, created_at) 
         VALUES(:cod_estudiante, :cod_rfid, :cod_estado, :created_at)";

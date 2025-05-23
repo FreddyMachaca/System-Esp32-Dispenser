@@ -32,7 +32,7 @@
             ':cod_estado'   =>  1,
             ':created_at'   =>  $fecha,
         ]); 
-        //! verificar si hay tarjeta
+        //verificar si hay tarjeta
         if(!empty($codigo_rfid)) {
             
             $cod_estudiante = $dbh->lastInsertId();

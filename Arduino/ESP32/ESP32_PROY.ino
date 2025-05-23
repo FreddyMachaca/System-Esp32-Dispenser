@@ -60,7 +60,6 @@ const int PIN_STOP = 13;
 // Tiempo de espera máximo para detección de caída (5 segundos)
 const unsigned long TIEMPO_ESPERA_CAIDA = 5000;
 
-// Prototipos de funciones
 void establecerSalidas(int numero);
 void enviarAlServidor(String dato, int tipo, String tecla, String accion = "verificar");
 void procesarRespuestaTransaccion(String respuesta, String accion);
@@ -193,8 +192,7 @@ void enviarAlServidor(String dato, int tipo, String tecla, String accion) {
                 String respuesta = http.getString();
                 Serial.println("Respuesta del servidor: " + respuesta);
                 
-                // Procesar la respuesta JSON
-                if (tipo == 1) { // Si es una transacción
+                if (tipo == 1) {
                     procesarRespuestaTransaccion(respuesta, accion);
                 }
                 
@@ -210,7 +208,6 @@ void enviarAlServidor(String dato, int tipo, String tecla, String accion) {
     }
 }
 
-// Procesar la respuesta JSON de la transacción
 void procesarRespuestaTransaccion(String respuesta, String accion) {
     DynamicJsonDocument doc(1024);
     DeserializationError error = deserializeJson(doc, respuesta);
@@ -230,14 +227,12 @@ void procesarRespuestaTransaccion(String respuesta, String accion) {
         JsonObject data = doc["data"];
         
         if (accion == "verificar") {
-            // Guardar información para mostrar cuando se complete la transacción
             infoEstudiante = data["estudiante"].as<String>();
             infoProducto = data["producto"].as<String>();
             infoPrecio = data["precio"].as<String>();
             infoSaldoActual = data["saldo_actual"].as<String>();
             infoSaldoRestante = data["saldo_restante"].as<String>();
             
-            // Mostrar información en el serial
             Serial.println("\n----- DETALLE DE PRODUCTO -----");
             Serial.println("Estudiante: " + infoEstudiante);
             Serial.println("Producto: " + infoProducto);
@@ -264,7 +259,6 @@ void procesarRespuestaTransaccion(String respuesta, String accion) {
         Serial.println(mensaje);
         Serial.println("---------------------------------\n");
         
-        // Si la verificación falla, asegurarse de marcar como no verificado
         if (accion == "verificar") {
             productoVerificado = false;
         }
@@ -346,7 +340,6 @@ void loop() {
             // Producto detectado, procesar la compra
             if (productoVerificado && serialRecibido != "") {
                 Serial.println("Producto caído detectado - Procesando compra...");
-                // Usar el slotNumero guardado, no codigoProducto que podría estar vacío
                 enviarAlServidor(serialRecibido, 1, String(slotNumero), "comprar");
             }
             

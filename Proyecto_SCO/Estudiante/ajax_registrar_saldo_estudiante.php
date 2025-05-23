@@ -7,7 +7,7 @@ try {
     $saldo_recargar = (float)$_POST['saldo_recargar']; 
     $fecha_actualizacion = date('Y-m-d H:i:s');
 
-    //* Obtener saldo, cod_tarjeta, deuda
+    //Obtener saldo, cod_tarjeta, deuda
     $query_verifica = "SELECT s.saldo_actual, s.deuda, tr.cod_tarjeta
                         FROM estudiantes e 
                         INNER JOIN tarjetas_rfid tr ON tr.cod_estudiante = e.cod_estudiante
@@ -56,7 +56,6 @@ try {
     $response['message'] = $e->getMessage();
 }
 function registrarSaldo($dbh, $nuevo_saldo, $nueva_deuda, $fecha_actualizacion, $cod_tarjeta, $cod_estado){
-    //! Actualizar tabla saldo
     $stmt_update = $dbh->prepare("UPDATE saldos 
         SET saldo_actual = :saldo_actual, deuda = :deuda, updated_at = :updated_at, cod_estado = :cod_estado
         WHERE cod_tarjeta = :cod_tarjeta");

@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         
-        // 1. Verificar si existe el estudiante con la tarjeta RFID
+        //Verificar si existe el estudiante con la tarjeta RFID
         $query_estudiante = "SELECT e.cod_estudiante, CONCAT(e.nombre, ' ', e.paterno) AS nombre, 
                                   tr.cod_tarjeta, s.saldo_actual, s.deuda
                             FROM estudiantes e
@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         
-        // 2. Verificar si hay un producto en el slot seleccionado
+        // Verificar si hay un producto en el slot seleccionado
         $query_producto = "SELECT pm.cod_producto_maquina, p.cod_producto, p.nombre, p.precio, 
                                  pm.cantidad, m.ubicacion
                            FROM productos_maquina pm
@@ -62,14 +62,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         
-        // 3. Verificar si hay stock disponible
+        // Verificar si hay stock disponible
         if ($producto['cantidad'] <= 0) {
             $response['message'] = "Error: No hay stock disponible del producto";
             echo json_encode($response);
             exit;
         }
         
-        // 4. Verificar si el estudiante tiene saldo suficiente
+        // Verificar si el estudiante tiene saldo suficiente
         $precio_producto = floatval($producto['precio']);
         $saldo_actual = floatval($estudiante['saldo_actual']);
         
@@ -79,7 +79,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         
-        // Si es solo verificación, retornar información
         if ($accion === 'verificar') {
             $response['status'] = true;
             $response['message'] = "Puede comprar el producto";
@@ -94,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         
-        // 5. Si es compra, procesar la transacción
+        // Si es compra, procesar la transacción
         if ($accion === 'comprar') {
             // Actualizar el saldo del estudiante
             $nuevo_saldo = $saldo_actual - $precio_producto;
@@ -129,8 +128,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ':cod_producto_maquina' => $producto['cod_producto_maquina']
             ]);
             
-            // Registrar la transacción en las tablas transacciones y detalle_transacciones
-            // 1. Crear la transacción
             $query_transaccion = "INSERT INTO transacciones
                                (cod_tarjeta, fecha, total, cod_estado, created_at)
                                VALUES (:cod_tarjeta, :fecha, :total, :cod_estado, :created_at)";
@@ -146,7 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $cod_transaccion = $dbh->lastInsertId();
             
-            // 2. Crear el detalle de la transacción
+            // Crear el detalle de la transacción
             $query_detalle = "INSERT INTO detalle_transacciones
                            (cod_transaccion, cod_producto_maquina, cantidad, precio_unitario, cod_estado, created_at)
                            VALUES (:cod_transaccion, :cod_producto_maquina, :cantidad, :precio_unitario, :cod_estado, :created_at)";

@@ -289,7 +289,7 @@ $(document).ready(function() {
         });
 
 
-        //* Si se agota el tiempo detiene todo
+        //Si se agota el tiempo detiene todo
         timeout = setTimeout(() => {
             cancelado = true;
             Swal.close();

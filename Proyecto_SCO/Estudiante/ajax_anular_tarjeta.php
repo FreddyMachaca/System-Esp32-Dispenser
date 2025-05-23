@@ -10,7 +10,7 @@
 
         $fecha = date('Y-m-d');
         $fecha_actualizacion = date('Y-m-d H:i:s');
-        //! Registro en la tabla estudiantes   
+        //Registro en la tabla estudiantes   
        
         $query_tarjeta = "UPDATE tarjetas_rfid SET cod_estado = :cod_estado, updated_at = :updated_at WHERE cod_estudiante = :cod_estudiante and codigo_rfid = :codigo_rfid";
         $stmt_registro = $dbh->prepare($query_tarjeta);
